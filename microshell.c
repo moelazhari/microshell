@@ -6,13 +6,11 @@
 /*   By: mazhari <mazhari@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/12/22 13:50:08 by mazhari           #+#    #+#             */
-/*   Updated: 2022/12/23 15:00:17 by mazhari          ###   ########.fr       */
+/*   Updated: 2022/12/24 23:14:46 by mazhari          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
-#include <string.h>
-#include <unistd.h>
-#include <sys/wait.h>
+#include "microshell.h"
 
 int fd_in;
 
@@ -35,11 +33,10 @@ int ft_cd(char **av, int i)
 int exec(char **av, int i, char **env)
 {
 	int p[2];
-	int	res;
 	int ispipe = (av[i] && !strcmp(av[i], "|"));
-    // if (!strcmp(*av, "cd"))
-    //     return (ft_cd(av, i));
 	
+    if (!strcmp(*av, "cd"))
+        return (ft_cd(av, i));
 	if (ispipe)
         if (pipe(p) == -1)
 		    return print("error: fatal\n");
@@ -47,8 +44,8 @@ int exec(char **av, int i, char **env)
 	if (pid == 0)
 	{
 		av[i] = NULL;
-		dup2(fd_in, 0);
-        close(fd_in); 
+		dup2(fd_in, STDIN_FILENO);
+        close(fd_in);
         if (ispipe)
         {
             dup2(p[1], 1);
@@ -65,17 +62,17 @@ int exec(char **av, int i, char **env)
         close(p[0]);
         close(p[1]);
     }
-    waitpid(pid, &res, 0);
-	return WEXITSTATUS(res);
+	return 0;
 }
 
 int main(int ac, char **av, char **env)
 {
 	(void)ac;
 	int i = 0;
+	int	res;
 	int j = 0;
 
-	fd_in = dup(0);
+	fd_in = dup(STDIN_FILENO);
 	av += 1;
 	while (av[i])
 	{
@@ -83,10 +80,13 @@ int main(int ac, char **av, char **env)
 			i++;
 		if (i)
 			j = exec(av, i, env);
-		av += i;
+        if (!av[i])
+            break ;
+		av += i + 1;
 		i = 0;
 	}
-    dup2(fd_in, 0);
-    close(fd_in);
+	if (close(fd_in) == -1)
+		print("error: fatal\n");
+	while (waitpid(-1, &res, 0) != -1);
 	return (j);
 }
