@@ -10,89 +10,83 @@
 /*                                                                            */
 /* ************************************************************************** */
 
-#include "microshell.h"
+#include <string.h>
+#include <unistd.h>
+#include <sys/wait.h>
 
-int ft_strlen(char *str)
+int fd_in;
+
+int print(char *string)
 {
-    int i;
-
-    i = 0;
-    while (str[i])
-        i++;
-    return (i);
+	while (*string)
+		write(2, string++, 1);
+	return 1;
 }
 
-void ft_cd(char *path)
+int ft_cd(char **av, int i)
 {
-    if (chdir(path) == -1)
-    {
-        write(2, "error: cd: cannot change directory to", 31);
-        write(2, path, ft_strlen(path));
-        write(2, "\n", 1);
-    }
+	if (i != 2)
+		return print("error: cd: bad arguments\n");
+	if (chdir(av[1]))
+		return print("error: cd: cannot change directory to ") & print(av[1]) & print("\n");
+	return 0;
 }
 
-void exec(char **cmd, char **env)
+int exec(char **av, int i, char **env)
 {
-    int pid;
-
-    pid = fork();
-    if (pid == -1)
-        write(2, "error: fatal" , 12);
-    else if (pid == 0)
+	int p[2];
+	int	res;
+	int ispipe = (av[i] && !strcmp(av[i], "|"));
+    // if (!strcmp(*av, "cd"))
+    //     return (ft_cd(av, i));
+	
+	if (ispipe)
+        if (pipe(p) == -1)
+		    return print("error: fatal\n");
+	int pid = fork();
+	if (pid == 0)
+	{
+		av[i] = NULL;
+		dup2(fd_in, 0);
+        close(fd_in); 
+        if (ispipe)
+        {
+            dup2(p[1], 1);
+            close(p[1]);
+            close(p[0]);
+        }
+		execve(*av, av, env);
+		return print("error: cannot execute ") & print(*av) & print("\n");
+	}
+    dup2(0, fd_in);
+    if (ispipe)
     {
-        if (execve(cmd[0], &cmd[0], env) == -1)
-            {
-                write(2, "error: cannot execute", 30);
-                write(2, cmd[0], ft_strlen(cmd[0]));
-                write(2, "\n", 1);
-            }
+        dup2(p[0], fd_in);
+        close(p[0]);
+        close(p[1]);
     }
-}
-
-char **get_cmd(char **av, int n)
-{
-    int i;
-    char **cmd;
-    
-    i = 0;
-    if (!(cmd = malloc(sizeof(char *) * n + 2)))
-         write(2, "error: fatal" , 12);
-    while (i < n)
-    {
-        cmd[i] = strdup(av[i]);
-        i++;
-    }
-    cmd[i] = NULL;
-    return (cmd);
+    waitpid(pid, &res, 0);
+	return WEXITSTATUS(res);
 }
 
 int main(int ac, char **av, char **env)
 {
-    int i;
-    char **cmd;
-    
-    i = 0;
-    av = av + 1;
-    while (av[i])
-    {
-        if (strcmp(av[i], "|") == 0)
-        {
-            printf("%s\n", av[0]);
-            cmd = get_cmd(av, i);
-            exec(cmd ,env);
-            av = av + i + 1;
-            i = 0;
-        }
-        // if (strcmp(av[i], ";") == 0)
-        // {
-        //     dup2(tmp[0], STDIN_FILENO);
-        //     dup2(tmp[1], STDOUT_FILENO);
-        //     cmd = get_cmd(av, i);
-        //     exec(cmd ,env);
-        // }
-        i++;
-    } 
-    return (0); 
-}
+	(void)ac;
+	int i = 0;
+	int j = 0;
 
+	fd_in = dup(0);
+	av += 1;
+	while (av[i])
+	{
+		while (av[i] && strcmp(av[i], "|") && strcmp(av[i], ";"))
+			i++;
+		if (i)
+			j = exec(av, i, env);
+		av += i;
+		i = 0;
+	}
+    dup2(fd_in, 0);
+    close(fd_in);
+	return (j);
+}
