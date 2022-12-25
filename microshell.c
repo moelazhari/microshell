@@ -6,7 +6,7 @@
 /*   By: mazhari <mazhari@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/12/22 13:50:08 by mazhari           #+#    #+#             */
-/*   Updated: 2022/12/24 23:14:46 by mazhari          ###   ########.fr       */
+/*   Updated: 2022/12/25 19:13:47 by mazhari          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -25,7 +25,7 @@ int ft_cd(char **av, int i)
 {
 	if (i != 2)
 		return print("error: cd: bad arguments\n");
-	if (chdir(av[1]))
+	if (chdir(av[1]) == -1)
 		return print("error: cd: cannot change directory to ") & print(av[1]) & print("\n");
 	return 0;
 }
@@ -44,24 +44,19 @@ int exec(char **av, int i, char **env)
 	if (pid == 0)
 	{
 		av[i] = NULL;
-		dup2(fd_in, STDIN_FILENO);
-        close(fd_in);
+		if (dup2(fd_in, 0) == -1 || close(fd_in) == -1)
+			return print("error: fatal\n");
         if (ispipe)
-        {
-            dup2(p[1], 1);
-            close(p[1]);
-            close(p[0]);
-        }
+           if (dup2(p[1], 1) == -1 || close(p[1]) == -1 || close(p[0]) == -1)
+				return print("error: fatal\n");
 		execve(*av, av, env);
 		return print("error: cannot execute ") & print(*av) & print("\n");
 	}
-    dup2(0, fd_in);
+    if (dup2(0, fd_in) == -1)
+		return print("error: fatal\n");
     if (ispipe)
-    {
-        dup2(p[0], fd_in);
-        close(p[0]);
-        close(p[1]);
-    }
+        if (dup2(p[0], fd_in) == -1 || close(p[0]) == -1 || close(p[1]) == -1)
+			return print("error: fatal\n");
 	return 0;
 }
 
@@ -69,24 +64,23 @@ int main(int ac, char **av, char **env)
 {
 	(void)ac;
 	int i = 0;
-	int	res;
-	int j = 0;
 
-	fd_in = dup(STDIN_FILENO);
+	fd_in = dup(0);
 	av += 1;
 	while (av[i])
 	{
 		while (av[i] && strcmp(av[i], "|") && strcmp(av[i], ";"))
 			i++;
 		if (i)
-			j = exec(av, i, env);
+			if (exec(av, i, env))
+				return (1);
         if (!av[i])
             break ;
 		av += i + 1;
 		i = 0;
 	}
-	if (close(fd_in) == -1)
+	while (wait(NULL) > 0);
+	if (dup2(fd_in, 0) == -1 || close(fd_in) == -1)
 		print("error: fatal\n");
-	while (waitpid(-1, &res, 0) != -1);
-	return (j);
+	return (0);
 }
