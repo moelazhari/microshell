@@ -6,7 +6,7 @@
 /*   By: mazhari <mazhari@student.42.fr>            +#+  +:+       +#+        */
 /*                                                +#+#+#+#+#+   +#+           */
 /*   Created: 2022/12/22 13:50:08 by mazhari           #+#    #+#             */
-/*   Updated: 2022/12/25 19:13:47 by mazhari          ###   ########.fr       */
+/*   Updated: 2022/12/26 23:15:26 by mazhari          ###   ########.fr       */
 /*                                                                            */
 /* ************************************************************************** */
 
@@ -47,11 +47,12 @@ int exec(char **av, int i, char **env)
 		if (dup2(fd_in, 0) == -1 || close(fd_in) == -1)
 			return print("error: fatal\n");
         if (ispipe)
-           if (dup2(p[1], 1) == -1 || close(p[1]) == -1 || close(p[0]) == -1)
+           if (dup2(p[1], 1) == -1 || close(p[1]) == -1 || close(p[0] == -1))
 				return print("error: fatal\n");
 		execve(*av, av, env);
 		return print("error: cannot execute ") & print(*av) & print("\n");
 	}
+	waitpid(pid, NULL, 0);
     if (dup2(0, fd_in) == -1)
 		return print("error: fatal\n");
     if (ispipe)
@@ -79,7 +80,6 @@ int main(int ac, char **av, char **env)
 		av += i + 1;
 		i = 0;
 	}
-	while (wait(NULL) > 0);
 	if (dup2(fd_in, 0) == -1 || close(fd_in) == -1)
 		print("error: fatal\n");
 	return (0);
